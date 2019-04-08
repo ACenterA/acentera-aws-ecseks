@@ -1,0 +1,1627 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: ACenterA - ECS/EKS Serverless Portal - <%STAGE%> Resources - <%SEMVER%>
+Metadata:
+  AWS::ServerlessRepo::Application:
+    Name: acentera-<%STAGE%>-ecseks-resources
+    Description: 'ECS / EKS  AWS Resources such as IAM roles, CloudWatch Events'
+    Author: ACentetrA
+    SpdxLicenseId: Apache-2.0
+    LicenseUrl: LICENSE
+    ReadmeUrl: README.md
+    Labels:
+    - ecs
+    - eks
+    - ecseks
+    - serverless
+    - acentera
+    - plugins
+    - container
+    - <%STAGE%>
+    HomePageUrl: https://acentera.com/
+    SemanticVersion: <%SEMVER%>
+    SourceCodeUrl: https://github.com/ACenterA/acentera-aws-ecseks-resources
+Outputs:
+  AccountId:
+    Value:
+      Fn::Sub: ${AWS::AccountId}
+    Description: The AccountId for Bootstrap
+
+  PluginVersion:
+    Value: "<%SEMVER%>"
+    Description: The Plugin Version
+
+  NetworkingMacro:
+    Value:
+      Fn::GetAtt: "TransformFunction.Arn"
+    Description: Generic Networking Transform Macro Arn
+  NetworkingMacroName:
+    Value:
+      Fn::Sub: acentera-${Stage}-ecseks-${AWS::Region}-ManageVPCTransorm
+    Description: Generic Networking Transform Macro Name
+
+  ASGMacro:
+    Value:
+      Fn::GetAtt: "TransformMasterFunction.Arn"
+    Description: Generic ASG Transform Macro Arn
+
+  ASGMacroName:
+    Value: 
+      Fn::Sub: acentera-${Stage}-ecseks-${AWS::Region}-ManageASG
+    Description: Generic ASG Transform Macro Name
+
+  LambdaFunctionRole:
+    Value:
+      Fn::GetAtt: "LambdaFunctionRole.Arn"
+    Description: Our account Lambda iam role to describe subnets, ec2 instances ...
+    Export:
+      Name:
+        Fn::Sub: "acentera:${Stage}:ecseks:IAM:LambdaRole"
+
+  ACenterALambdaFunctionRole:
+    Value: 
+      Fn::GetAtt: "ACenterALambdaFunctionRole.Arn"
+    Description: Grant ACenterA the ability to Create, and Describe Image and tags base on our EC2 Instance.
+       Allow to Describe or Update a specific autoscaling group (Policy passed by STS Assume Role to restrict the 3rd party access)
+    Export:
+      Name: 
+        Fn::Sub: "acentera:${Stage}:ecseks:IAM:ACenterALambdaRole"
+
+#  EC2AMILogs:
+#    Value: 
+#       Ref: "EC2AMILogs"
+#    Description: Default EC2 AMI LogGroup
+#       Allow EC2 Instances to sends logs to cloudwatch in this LogGroup
+#    Export:
+#      Name: ..Sub "acentera:${Stage}:ecseks:CloudWatch:EC2AMILogs"
+
+  ImageBuilderRole:
+    Value: 
+      Ref: "ImageBuilderRole"
+    Description: Grant an EC2 IAM Role to perform basic access.
+#    Export:
+#      Name: !Sub "acentera:${Stage}:ecseks:IAM:ImageBuilderRole"
+
+  EC2BaseACenterARole:
+    Value: 
+      Ref: "EC2BaseACenterARole"
+    Description: Grant an EC2 IAM Role to perform basic access.
+#    Export:
+#      Name: !Sub "acentera:${Stage}:ecseks:IAM:EC2BaseACenterARole"
+
+#  ImageBuilderRoleArn:
+#    Value: !GetAtt [ "ImageBuilderRoleArn", "Arn" ]
+#    Description: Grant an EC2 IAM Role to perform basic access.
+#    Export:
+#      Name: !Sub "acentera:${Stage}:ecseks:IAM:ImageBuilderRoleArn"
+
+  ImageBuilderInstanceRoleArn:
+    Value: 
+      Fn::GetAtt: [ "ImageBuilderInstanceProfile", "Arn" ]
+    Description: Grant an EC2 IAM Role to perform basic access.
+#    Export:
+#      Name: !Sub "acentera:${Stage}:ecseks:IAM:ImageBuilderInstanceRoleArn"
+
+  EC2BaseACenterARoleArn:
+    Value: 
+      Fn::GetAtt: [ "EC2BaseACenterAInstanceProfile", "Arn" ]
+    Description: Grant an EC2 IAM Role to perform boot process access.
+#    Export:
+#      Name: !Sub "acentera:${Stage}:ecseks:IAM:EC2BaseACenterARoleArn"
+
+  EC2BaseACenterALimitedRole:
+    Value: 
+      Ref: "EC2BaseACenterALimitedRole"
+    Description: Grant an EC2 IAM Role to perform basic access.
+#    Export:
+#      Name: !Sub "acentera:${Stage}:ecseks:IAM:EC2BaseACenterALimitedRole"
+
+  EC2BaseACenterALimitedInstanceProfile:
+    Value: 
+      Fn::GetAtt: [ "EC2BaseACenterAInstanceProfile", "Arn" ]
+    Description: Grant an EC2 IAM Role to perform basic access.
+#    Export:
+#      Name: !Sub "acentera:${Stage}:ecseks:IAM:EC2BaseACenterALimitedRoleArn"
+
+  SnsTopic:
+    Value: 
+      Ref: Topic
+    Description: SNS Topic for processing events
+    Export:
+      Name: 
+          Fn::Sub: "acentera:${Stage}:ecseks:Sns:TopicArn"
+
+Parameters:
+#  Topic:
+#    Description: Alarm notification Topic
+#    Default: ""
+#    Type: String
+#
+#  FallbackTopic:
+#    Description: Alarm notification Fallback Topic
+#    Default: ""
+#    Type: String
+  AppS3Assets:
+    Type: String
+    Default: ''
+    Description: "The ACenterA S3 Assets"
+
+  SiteKey:
+    Description: ACenterA Site Key from Admin Portal
+    Default: 12f9b231-88b5-40c9-9f75-cc14f854a7bb
+    Type: String
+
+  Stage:
+    Description: "lowercase stage name. such as <%STAGE%>"
+    Default: "<%STAGE%>"
+    AllowedValues: [ "<%STAGE%>" ]
+    Type: String    
+
+  Secret:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: acentera-<%STAGE%>-secret
+
+  JWTSecret:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: acentera-<%STAGE%>-clientsecret
+
+  ServerSecret:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: acentera-<%STAGE%>-serversecret
+
+Conditions:
+  IsS3Defined: 
+     Fn::Not:
+        - Fn::Equals:
+            - Ref: AppS3Assets
+            - ""
+
+Mappings:
+  Cognito:
+    Values:
+      AuthName: ACenterA
+  Plugin:
+    Values:
+      Name: ecseks
+Globals:
+  Function:
+    Environment:
+      Variables:
+        ACCOUNT_ID:
+          Fn::Sub: ${AWS::AccountId}
+        APP_DATA_TABLE_NAME: 
+          Fn::Sub: acentera-${Stage}-AppData
+        APP_DATA_PERM_TABLE_NAME: 
+          Fn::Sub: acentera-${Stage}-AppDataPermissions
+        SESSION_TABLE_NAME: 
+          Fn::Sub: acentera-${Stage}-Sessions
+        STAGE: 
+          Fn::Sub: ${Stage}
+        REGION:
+          Fn::Sub: ${AWS::Region}
+        STACK_NAME:
+          Fn::Sub: ${AWS::StackName}
+        STACK_ID:
+          Fn::Sub: ${AWS::StackId}
+        S3_BUCKET:
+          Fn::If:
+             - IsS3Defined
+             - Ref: AppS3Assets
+             - Fn::Sub: "acentera-core-${Stage}-assets-${AWS::Region}-${AWS::AccountId}"
+        PLUGIN_NAME: ecseks
+        PLUGIN_VERSION: "<%SEMVER%>"
+        SITE_KEY:
+          Ref: SiteKey
+        SITE:
+          Ref: SiteKey
+#        SITE_TITLE:
+#          Ref: SiteTitle
+#        JWT_SECRET:
+#          Ref: JWTSecret
+#        KEY_ID:
+#          Ref: Secret
+#        SECRET:
+#          Ref: ServerSecret
+    Handler: main
+    Runtime: go1.x
+    Timeout: 60
+    Layers:
+    - Ref: RequestsLayerf8452628d3
+
+Resources:
+  RequestsLayerf8452628d3:
+    Type: AWS::Lambda::LayerVersion
+    Properties:
+      Content:
+        S3Bucket: lambda-at-edge-dev-serverlessdeploymentbucket-1gmbbmp4ajnba
+        S3Key: packaged/2019/0.0.1/acentera-ecseks/d8046cca96386e6d17976486f349abda
+      # ContentUri: s3://lambda-at-edge-dev-serverlessdeploymentbucket-1gmbbmp4ajnba/packaged/2019/0.0.1/acentera-ecseks/d8046cca96386e6d17976486f349abda
+      # remplace ... to Content ContentUri: s3://lambda-at-edge-dev-serverlessdeploymentbucket-1gmbbmp4ajnba/packaged/2019/0.0.1/acentera-ecseks/c22c0e4ce6c79f7c2e4ee36f68202e8b
+
+  ECSAutoScalingLambdaV1:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUrl: s3://%%BINARY%%
+      FunctionName: 
+        Fn::Sub: acentera-${Stage}-ecseks-${AWS::Region}-AutoScaling
+      Environment:
+        Variables:
+        # Need ENV Vars ..
+        # ACENTERA_MASTER_URL: #- acentera-master
+        # Ref: SiteKey
+        # PLUGIN_ID:  AddPluginSiteExcute.Id
+          REGION:
+            Fn::Sub: ${AWS::Region}
+      Runtime: go1.x
+      ReservedConcurrentExecutions: 2
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName: acentera-<%STAGE%>-AppData
+      - DynamoDBCrudPolicy:
+          TableName: acentera-<%STAGE%>-AppDataPermissions
+      - DynamoDBCrudPolicy:
+          TableName: acentera-<%STAGE%>-Sessions
+      - DynamoDBCrudPolicy:
+         TableName: "acentera-<%STAGE%>-AppData/index/gsi-data-index"
+      - DynamoDBCrudPolicy:
+         TableName: "acentera-<%STAGE%>-AppData/index/gsi-static-partition-index"
+      - DynamoDBCrudPolicy:
+         TableName: "acentera-<%STAGE%>-AppData/index/gsi-plugin-partition-index"
+
+
+#  ApiPluginLambdaGetSettingsPermissions:
+#    Type: "AWS::Lambda::Permission"
+#    Properties:
+
+  # Some ideas were takein from:  http://garbe.io/blog/2017/04/12/a-better-solution-to-ecs-autoscaling/
+  ECSAutoScalingCron:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Name: 
+        Fn::Sub: acentera-${Stage}-ecseks-${AWS::Region}-AutoScaling
+      Description: 'ECS AutoScaling - Validate room available'
+      # ScheduleExpression: 'rate(1 minute)'
+      ScheduleExpression: 'rate(5 minutes)'
+      State: ENABLED
+      Targets:
+      - Arn: 
+          Fn::GetAtt: 'ECSAutoScalingLambdaV1.Arn'
+        Id: lambda
+
+  ECSAutoScalingCronPermissions:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: 
+          Ref: ECSAutoScalingLambdaV1
+      Principal: 'events.amazonaws.com'
+      SourceArn: 
+         Fn::GetAtt: 'ECSAutoScalingCron.Arn'
+
+  # Some eideas were takein from : SchedulableContainers is described in detail here: http://garbe.io/blog/2017/04/12/a-better-solution-to-ecs-autoscaling/
+  ECSAutoScalingEventRule:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Name: 
+          Fn::Sub: acentera-${Stage}-ecseks-${AWS::Region}-EventScaling
+      Description: 'ECS AutoScaling - Event processing, also validate that ressources can be added'
+      EventPattern:
+        source:
+        - 'aws.ecs'
+        'detail-type':
+        - 'ECS Container Instance State Change'
+      State: ENABLED
+      Targets:
+      - Arn: 
+           Fn::GetAtt: 'ECSAutoScalingLambdaV1.Arn'
+        Id: lambda
+
+  ECSAutoScalingFailedInvocationsTooHighAlarm:
+    Type: 'AWS::CloudWatch::Alarm'
+    Properties:
+      AlarmName: 
+         Fn::Sub: "[ ${Stage} ] - ecseks - AutoScaleError"
+      AlarmDescription: 'Validate ECS instances have enough ressources.'
+      Namespace: 'AWS/Events'
+      MetricName: FailedInvocations
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 1
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      Threshold: 1
+      AlarmActions:
+      - Ref: Topic
+      Dimensions:
+      - Name: RuleName
+        Value: 
+          Ref: ECSAutoScalingCron
+
+
+  ECSAutoScalingTooHighAlarm:
+    Type: 'AWS::CloudWatch::Alarm'
+    Properties:
+      AlarmName: 
+         Fn::Sub: "[ ${Stage} ] - ecseks - AutoScaleAllHighError"
+      AlarmDescription: 'Validate ECS instances have enough ressources.'
+      Namespace: 'ACENTERA/ECS'
+      MetricName: AutoScale
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 6
+      ComparisonOperator: GreaterThanThreshold
+      Threshold: 1.9
+      TreatMissingData: notBreaching
+      AlarmActions:
+      - Ref: FallbackTopic
+      Dimensions:
+      - Name: ClusterName
+        Value: ALL
+
+  ECSAutoScalingTooLowAlarm:
+    Type: 'AWS::CloudWatch::Alarm'
+    Properties:
+      AlarmName: 
+         Fn::Sub: "[ ${Stage} ] - ecseks -AutoScaleAllLowError"
+      AlarmDescription: 'Validate ECS instances have enough ressources.'
+      Namespace: 'ACENTERA/ECS'
+      MetricName: AutoScale
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 90
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: notBreaching
+      Threshold: 0.15
+      AlarmActions:
+      - Ref: FallbackTopic
+      Dimensions:
+      - Name: ClusterName
+        Value: ALL
+
+
+  S3ReadOnlyRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: 
+         Fn::Sub: /acentera/${Stage}/default/plugins/ecseks/s3/readonly/
+      RoleName: 
+         Fn::Sub: acentera-${Stage}-ecseks-${AWS::Region}-S3ReadOnly
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - spotfleet.amazonaws.com
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+
+  EC2AllowS3GetPolicy:
+    Type: AWS::IAM::Policy
+    DependsOn:
+      - S3ReadOnlyRole
+    Properties:
+      PolicyName: AllowS3DownloadUserDataInLaunchConfiguration_NoRestrictions
+      Roles:
+        - Ref: S3ReadOnlyRole
+      PolicyDocument:
+          Statement:
+             - Action:
+                  - s3:GetObject
+               Effect: Allow
+               Resource:
+                 - "arn:aws:s3:::*"
+
+#  EC2AMILogs:
+#    Type: AWS::Logs::LogGroup
+#    Properties:
+#      LogGroupName: 
+#         Fn::Sub: ${AWS::StackName}-EC2AMILogs
+#      RetentionInDays: 7
+
+  # TODO: Make an create an STS from this role and pass it to the Instance ...
+  # Or something like this : https://aws.amazon.com/blogs/security/how-to-help-lock-down-a-users-amazon-ec2-capabilities-to-a-single-vpc/
+  EC2BaseACenterARole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: 
+         Fn::Sub: /acentera/${Stage}/default/plugins/ecseks/ec2/
+      RoleName: 
+         Fn::Sub: acentera-${Stage}-ecseks-${AWS::Region}-EC2BaseRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - spotfleet.amazonaws.com
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role
+        - arn:aws:iam::aws:policy/AmazonElasticFileSystemReadOnlyAccess
+
+      Policies:
+        - PolicyName: RexrayVolumesPolicy
+       # removed.for security ...   "ec2:DeleteVolume",
+       # removed for security ...   "ec2:DeleteSnapshot"
+       # removed for security ... create volume is done via CFN  "ec2:CreateVolume"
+       # removed for secucrity ... create tags is done via CFN  "ec2:CreateTags"
+       # removed for security ...   "ec2:CreateSnapshot"
+       # removed for security ...   "ec2:CopySnapshot"
+       # removed for security ..   "ec2:ModifySnapshotAttribute",
+       # "ec2:DescribeSnapshots",
+       # "ec2:DescribeSnapshotAttribute",
+       # "elasticfilesystem:DescribeMountTargets"
+
+                  # efs .. "ec2:DescribeSubnets"
+                  # efs .. "ec2:DescribeNetworkInterfaces"
+                  # efs .. "ec2:CreateNetworkInterface"
+
+          PolicyDocument: |
+            {
+              "Version": "2012-10-17",
+              "Statement": [{
+                "Effect": "Allow",
+                "Action": [
+                  "ec2:AttachVolume",
+                  "ec2:DescribeAvailabilityZones",
+                  "ec2:DescribeInstances",
+                  "ec2:DescribeVolumes",
+                  "ec2:DescribeVolumeAttribute",
+                  "ec2:DescribeVolumeStatus",
+                  "ec2:DetachVolume",
+                  "ec2:ModifyVolumeAttribute",
+                  "ec2:DescribeTags"
+                ],
+                "Resource": "*"
+              }]
+            }
+        - PolicyName: RexrayEFSPolicy
+          PolicyDocument: |
+            {
+              "Version": "2012-10-17",
+              "Statement": [{
+                "Effect": "Allow",
+                "Action": [
+                  "elasticfilesystem:CreateTags",
+                  "elasticfilesystem:DescribeFileSystems"
+                ],
+                "Resource": "*"
+              }]
+            }
+        - PolicyName: AllowS3DownloadUserDataLimitedByBucketInLaunchConfiguration
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource:
+                   Fn::Sub:
+                     - "arn:aws:s3:::${BUCKET}"
+                     - BUCKET:
+                         Fn::If:
+                            - IsS3Defined
+                            - Ref: AppS3Assets
+                            - Fn::Sub: "acentera-core-${Stage}-assets-${AWS::Region}-${AWS::AccountId}"
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource:
+                   Fn::Sub:
+                     - "arn:aws:s3:::${BUCKET}/private/plugins/ecseks/*"
+                     - BUCKET:
+                         Fn::If:
+                            - IsS3Defined
+                            - Ref: AppS3Assets
+                            - Fn::Sub: "acentera-core-${Stage}-assets-${AWS::Region}-${AWS::AccountId}"
+
+        - PolicyName: AllowSSMAgent
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssmmessages:CreateControlChannel
+                  - ssmmessages:CreateDataChannel
+                  - ssmmessages:OpenControlChannel
+                  - ssmmessages:OpenDataChannel
+                  - ssm:UpdateInstanceInformation
+                  - ec2messages:AcknowledgeMessage
+                  - ec2messages:DeleteMessage
+                  - ec2messages:FailMessage
+                  - ec2messages:GetEndpoint
+                  - ec2messages:GetMessages
+                  - ec2messages:SendReply
+                  - ssm:UpdateInstanceInformation
+                  - ssm:ListInstanceAssociations
+                  - ssm:DescribeInstanceProperties
+                  - ssm:DescribeDocumentParameters
+                Resource: "*"
+        - PolicyName: AllowSSMCloudWatchPutMetric
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricData
+                Resource: "*"
+        - PolicyName: AllowECSRoleToAccessESCluster
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecs:*
+                Resource: "*"
+        - PolicyName: AllowECSAndContainerRegistryECR
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:GetRepositoryPolicy
+                  - ecr:DescribeRepositories
+                  - ecr:ListImages
+                  - ecr:DescribeImages
+                  - ecr:BatchGetImage
+                  - "ecs:DeregisterContainerInstance"
+                  - "ecs:DiscoverPollEndpoint"
+                  - "ecs:Poll"
+                  - "ecs:RegisterContainerInstance"
+                  - "ecs:StartTelemetrySession"
+                  - "ecs:Submit*"
+                  - "ecr:GetAuthorizationToken"
+                  - "ecr:BatchCheckLayerAvailability"
+                  - "ecr:GetDownloadUrlForLayer"
+                  - "ecr:BatchGetImage"
+                  - "ecs:UpdateContainerInstancesState"
+                  - "ecs:DiscoverPollEndpoint"
+                  - "ecs:DeregisterContainerInstance"
+                  - "ecs:ListContainerInstances"
+                  - "ecs:RegisterContainerInstance"
+                  - "ecs:SubmitContainerStateChange"
+                  - "ecs:SubmitTaskStateChange"
+                  - "ecs:Describe*"
+                  - "ecs:List*"
+                  - "ecs:UpdateContainerAgent"
+                  - "ecs:StartTask"
+                  - "ecs:StopTask"
+                  - "ecs:RunTask"
+                  - "ecs:DiscoverPollEndpoint"
+                  - "ecs:Submit*"
+                  - "ecs:Poll"
+                  - "ecs:StartTelemetrySession"
+                  - "ecs:PutAttributes"
+                  - "cloudformation:DescribeStackResource"
+                  - "ecs:DeregisterContainerInstance"
+                  - "ecs:DeregisterTaskDefinition"
+                  - "ecs:ListClusters"
+                  - "ecs:ListContainerInstances"
+                  - "ecs:ListTaskDefinitionFamilies"
+                  - "ecs:ListTaskDefinitions"
+                  - "ecs:ListTasks"
+                  - "ecs:SubmitContainerStateChange"
+                  - "ecs:UpdateContainerAgent"
+                  - "ecs:UpdateContainerInstancesState"
+                  - "SNS:Publish"
+                  - "elasticloadbalancing:DeregisterTargets"
+                Resource: "*"
+        - PolicyName: EC2AllowCloudWatchLogs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup    # Allow to create default OSLogs/xxxxx LogGroup per regions
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - logs:DescribeLogGroups
+                  - logs:DescribeLogStreams
+                Resource: "*"
+
+        - PolicyName: EC2AllowVolumeAttachAndDetach
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:DetachVolume
+                  - ec2:DeleteVolume
+                  - ec2:DescribeVolumes
+                  - ec2:AttachVolume
+                  - ec2:ModifyInstanceAttribute
+                Resource: "*"
+
+
+        - PolicyName: DescribeAndCreateAMIAndTags
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                  - ec2:DescribeTags
+                  - ec2:DescribeInstances
+                  - ec2:CreateTags
+                Effect: Allow
+                Resource: '*'
+
+        - PolicyName: DescribeAutoScalingGroupsAndCreditSpec
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                   - ec2:DescribeAutoScalingGroups
+                   - ec2:DescribeInstances
+                   - autoscaling:DescribeAutoScalingGroups
+                   - autoscaling:DescribeAutoScalingInstances
+                   - autoscaling:DescribeTags
+                   - autoscaling:CreateOrUpdateTags
+                   - ec2:ModifyInstanceCreditSpecification
+                   - autoscaling:DescribeLoadBalancers
+                Effect: Allow
+                Resource: '*'
+
+        - PolicyName: AllowSuspendResumeProcessSpotHandlers
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                   - autoscaling:ResumeProcesses
+                   - autoscaling:SuspendProcesses
+                Effect: Allow
+                Resource: '*'
+
+        - PolicyName: AllowCreateENI
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                    - ec2:CreateNetworkInterface
+                    - ec2:DescribeNetworkInterfaces
+                    - ec2:AttachNetworkInterface
+                    - ec2:DescribeSubnets
+                    - autoscaling:CompleteLifecycleAction
+                Effect: Allow
+                Resource: '*'
+        # At least one tag key called acentera:project
+#        - PolicyName: AllowAttachmentOfExistingENIAndTerminatePreviousInstance
+#          PolicyDocument:
+#            Version: '2012-10-17'
+#            Statement:
+#              - Action:
+#                    # Allow instance to terminate previous instance with current ENI / Volume attachment to optimize rolling updates ...
+#                    # Do not allow terminate instance we use the ASG to do so ... - ec2:TerminateInstances
+#                    # - ec2:AssociateIamInstanceProfile
+#                Effect: Allow
+#        #didnotwork        Condition:
+#        #          StringEquals:
+#        #            ForAnyValue:StringEquals:
+#        #              "aws:TagKeys":
+#        #                - "acentera:project"
+#                Resource: '*'
+
+  EC2BaseACenterALimitedInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    DependsOn:
+      - EC2BaseACenterALimitedRole
+    Properties:
+      Path: 
+        Fn::Sub: /acentera/${Stage}/default/plugins/ecseks/ec2/instanceprofile/limited/
+      Roles:
+        - Ref: "EC2BaseACenterALimitedRole"
+
+  EC2BaseACenterALimitedRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: 
+         Fn::Sub: /acentera/${Stage}/default/plugins/ecseks/ec2/
+      RoleName: 
+         Fn::Sub: acentera-${Stage}-ecseks-${AWS::Region}-EC2BaseLimitedRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - spotfleet.amazonaws.com
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: AllowSSMAgent
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssmmessages:CreateControlChannel
+                  - ssmmessages:CreateDataChannel
+                  - ssmmessages:OpenControlChannel
+                  - ssmmessages:OpenDataChannel
+                  - ssm:UpdateInstanceInformation
+                  - ec2messages:AcknowledgeMessage
+                  - ec2messages:DeleteMessage
+                  - ec2messages:FailMessage
+                  - ec2messages:GetEndpoint
+                  - ec2messages:GetMessages
+                  - ec2messages:SendReply
+                  - ssm:UpdateInstanceInformation
+                  - ssm:ListInstanceAssociations
+                  - ssm:DescribeInstanceProperties
+                  - ssm:DescribeDocumentParameters
+                Resource: "*"
+        - PolicyName: AllowSSMCloudWatchPutMetric
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricData
+                Resource: "*"
+        - PolicyName: AllowECSAndContainerRegistryECR
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:GetRepositoryPolicy
+                  - ecr:DescribeRepositories
+                  - ecr:ListImages
+                  - ecr:DescribeImages
+                  - ecr:BatchGetImage
+                  - "ecs:DeregisterContainerInstance"
+                  - "ecs:DiscoverPollEndpoint"
+                  - "ecs:Poll"
+                  - "ecs:RegisterContainerInstance"
+                  - "ecs:StartTelemetrySession"
+                  - "ecs:Submit*"
+                  - "ecr:GetAuthorizationToken"
+                  - "ecr:BatchCheckLayerAvailability"
+                  - "ecr:GetDownloadUrlForLayer"
+                  - "ecr:BatchGetImage"
+                  - "ecs:UpdateContainerInstancesState"
+                  - "ecs:DiscoverPollEndpoint"
+                  - "ecs:DeregisterContainerInstance"
+                  - "ecs:ListContainerInstances"
+                  - "ecs:RegisterContainerInstance"
+                  - "ecs:SubmitContainerStateChange"
+                  - "ecs:SubmitTaskStateChange"
+                  - "ecs:Describe*"
+                  - "ecs:List*"
+                  - "ecs:UpdateContainerAgent"
+                  - "ecs:StartTask"
+                  - "ecs:StopTask"
+                  - "ecs:RunTask"
+                  - "ecs:DiscoverPollEndpoint"
+                  - "ecs:Submit*"
+                  - "ecs:Poll"
+                  - "ecs:StartTelemetrySession"
+                  - "ecs:PutAttributes"
+                  - "cloudformation:DescribeStackResource"
+                  - "ecs:DeregisterContainerInstance"
+                  - "ecs:DeregisterTaskDefinition"
+                  - "ecs:ListClusters"
+                  - "ecs:ListContainerInstances"
+                  - "ecs:ListTaskDefinitionFamilies"
+                  - "ecs:ListTaskDefinitions"
+                  - "ecs:ListTasks"
+                  - "ecs:SubmitContainerStateChange"
+                  - "ecs:UpdateContainerAgent"
+                  - "ecs:UpdateContainerInstancesState"
+                  - "SNS:Publish"
+                  - "elasticloadbalancing:DeregisterTargets"
+                Resource: "*"
+        - PolicyName: EC2AllowCloudWatchLogs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup    # Allow to create default OSLogs/xxxxx LogGroup per regions
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - logs:DescribeLogGroups
+                  - logs:DescribeLogStreams
+                Resource: "*"
+
+        - PolicyName: EC2AllowVolumeAttachAndDetach
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:DescribeVolumes
+                  - ec2:ModifyInstanceAttribute
+                Resource: "*"
+
+        - PolicyName: DescribeAndCreateAMIAndTags
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                  - ec2:DescribeTags
+                  - ec2:DescribeInstances
+                  - ec2:CreateTags
+                Effect: Allow
+                Resource: '*'
+
+        - PolicyName: DescribeAutoScalingGroupsAndCreditSpec
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                   - ec2:DescribeAutoScalingGroups
+                   - autoscaling:DescribeAutoScalingGroups
+                   - autoscaling:DescribeAutoScalingInstances
+                   - autoscaling:DescribeTags
+                   - ec2:ModifyInstanceCreditSpecification
+                   - autoscaling:DescribeLoadBalancers
+                   - cloudformation:DescribeStackResource
+                Effect: Allow
+                Resource: '*'
+
+        - PolicyName: AllowSuspendResumeProcessSpotHandlers
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                   - autoscaling:ResumeProcesses
+                   - autoscaling:SuspendProcesses
+                Effect: Allow
+                Resource: '*'
+
+        - PolicyName: AllowAttachmentOfExistingENI
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                    - ec2:DescribeNetworkInterfaces
+                    - ec2:DescribeSubnets
+                    - ec2:DescribeInstances
+                    # Allow instance to terminate previous instance with current ENI / Volume attachment to optimize rolling updates ...
+                    - autoscaling:CompleteLifecycleAction
+                Effect: Allow
+                Resource: '*'
+
+  # EC2 / Generic Lambda Roles
+  ImageBuilderRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: 
+         Fn::Sub: /acentera/${Stage}/default/plugins/ecseks/ec2/
+      RoleName: 
+         Fn::Sub: acentera-${Stage}-ecseks-${AWS::Region}-EC2ImageBuilder
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - spotfleet.amazonaws.com
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+#      Policies:
+#        - PolicyName: EC2SpotPermissionAndPassRole
+#          PolicyDocument:
+#            Version: '2012-10-17'
+#            Statement:
+#              - Effect: Allow
+#                Action:
+#                  - ec2:RequestSpotInstances
+#                  - ec2:DescribeImages
+#                  - ec2:DescribeSubnets
+#                  - ec2:TerminateInstances
+#                Resource:
+#                  - '*'
+#              - Effect: Allow
+#                Action:
+#                  - iam:PassRole
+#                Resource:
+#                  - '*'
+#              - Effect: Allow
+#                Action:
+#                  - sns:Publish
+#                Resource:
+#                  - '*'
+
+  EC2AllowS3GetPolicy:
+    Type: AWS::IAM::Policy
+    DependsOn:
+      - ImageBuilderRole
+    Properties:
+      PolicyName: AllowS3DownloadUserDataLimitedByBucketInLaunchConfiguration
+      Roles:
+        - Ref: ImageBuilderRole
+      PolicyDocument:
+          Statement:
+            - Effect: Allow
+              Action:
+                - s3:ListBucket
+              Resource:
+                 Fn::Sub:
+                   - "arn:aws:s3:::${BUCKET}"
+                   - BUCKET:
+                         Fn::If:
+                            - IsS3Defined
+                            - Ref: AppS3Assets
+                            - Fn::Sub: "acentera-core-${Stage}-assets-${AWS::Region}-${AWS::AccountId}"
+
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+              Resource:
+                 Fn::Sub:
+                   - "arn:aws:s3:::${BUCKET}/private/plugins/ecseks/*"
+                   - BUCKET:
+                         Fn::If:
+                            - IsS3Defined
+                            - Ref: AppS3Assets
+                            - Fn::Sub: "acentera-core-${Stage}-assets-${AWS::Region}-${AWS::AccountId}"
+
+  EC2AllowECRPull:
+    Type: AWS::IAM::Policy
+    DependsOn:
+      - ImageBuilderRole
+    Properties:
+      PolicyName: AllowECRPull
+      Roles:
+        - Ref: ImageBuilderRole
+      PolicyDocument:
+          Statement:
+             - Action:
+                  - ecr:GetAuthorizationToken
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:GetRepositoryPolicy
+                  - ecr:DescribeRepositories
+                  - ecr:ListImages
+                  - ecr:DescribeImages
+                  - ecr:BatchGetImage
+               Effect: Allow
+               Resource:
+                 - "*"
+  EC2AllowSSM:
+    Type: AWS::IAM::Policy
+    DependsOn:
+      - ImageBuilderRole
+    Properties:
+      PolicyName: EC2AllowSSM
+      Roles:
+        - Ref: ImageBuilderRole
+      PolicyDocument:
+          Statement:
+             - Action:
+                  - ssmmessages:CreateControlChannel
+                  - ssmmessages:CreateDataChannel
+                  - ssmmessages:OpenControlChannel
+                  - ssmmessages:OpenDataChannel
+                  - ssm:UpdateInstanceInformation
+                  - ec2messages:AcknowledgeMessage
+                  - ec2messages:DeleteMessage
+                  - ec2messages:FailMessage
+                  - ec2messages:GetEndpoint
+                  - ec2messages:GetMessages
+                  - ec2messages:SendReply
+                  - ssm:UpdateInstanceInformation
+                  - ssm:ListInstanceAssociations
+                  - ssm:DescribeInstanceProperties
+                  - ssm:DescribeDocumentParameters
+                  - ec2:DescribeTags
+               Effect: Allow
+               Resource: "*"
+
+  EC2AllowCloudWatchLogs:
+    Type: AWS::IAM::Policy
+    DependsOn:
+      - ImageBuilderRole
+    Properties:
+      PolicyName: EC2AllowCloudwatchLogs
+      Roles:
+        - Ref: ImageBuilderRole
+      PolicyDocument:
+          Statement:
+             - Action:
+                  - logs:CreateLogGroup    # Allow to create default OSLogs/xxxxx LogGroup per regions
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - logs:DescribeLogGroups
+                  - logs:DescribeLogStreams
+               Effect: Allow
+               Resource: "*"
+
+  EC2AllowListVolumeAndDetach:
+    Type: AWS::IAM::Policy
+    DependsOn:
+      - ImageBuilderRole
+    Properties:
+      PolicyName: EC2AllowListVolumeAndDetach
+      Roles:
+        - Ref: ImageBuilderRole
+      PolicyDocument:
+          Statement:
+             - Action:
+                  - ec2:DetachVolume
+                  - ec2:DeleteVolume
+                  - ec2:DescribeVolumes
+                  - ec2:DescribeAutoScalingGroups
+                  - ec2:ModifyInstanceAttribute
+                  - ec2:CreateVolume
+                  - ec2:CreateTags
+               Effect: Allow
+               Resource: "*"
+
+  EC2BaseACenterAInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    DependsOn:
+      - EC2BaseACenterARole
+    Properties:
+      Path: 
+         Fn::Sub: /acentera/${Stage}/default/plugins/ecseks/ec2/instanceprofile/
+      InstanceProfileName: 
+         Fn::Sub: acentera-${Stage}-ecseks-${AWS::Region}-EC2ECSEKSBase
+      Roles:
+        - Ref: "EC2BaseACenterARole"
+
+  ImageBuilderInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    DependsOn:
+      - ImageBuilderRole
+    Properties:
+      Path: 
+        Fn::Sub: /acentera/${Stage}/default/plugins/ecseks/ec2/instanceprofile/
+      InstanceProfileName: 
+        Fn::Sub: acentera-${Stage}-ecseks-${AWS::Region}-ImageBuilder
+      Roles:
+        - Ref: "ImageBuilderRole"
+
+  ACenterALambdaFunctionRole:
+    Type: AWS::IAM::Role
+    DependsOn:
+      - LambdaFunctionRole
+    Properties:
+      Path: 
+        Fn::Sub: /acentera/${Stage}/default/plugins/ecseks/thirdparty/
+      RoleName: 
+        Fn::Sub: acentera-${Stage}-ecseks-${AWS::Region}-ACenterAThirdParty
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          # Allow Lambda to perform Assume Role to pass this role to the 3rd party
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+          - Effect: Allow
+            Principal:
+              AWS:
+                - Fn::GetAtt: [ LambdaFunctionRole, 'Arn' ]
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: DescribeAndCreateAMIAndTags
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                  - ec2:DescribeTags
+                  - ec2:DescribeInstances
+                  - ec2:DescribeImages
+                  - ec2:DescribeSnapshots
+                  - ec2:CreateTags
+                  - ec2:CreateImage
+                  - ec2:CreateSnapshot
+                  - ec2:DescribeSpotPriceHistory
+#                  - ec2:DeleteSnapshot
+#                  - ec2:DeregisterImage
+# These are added as passed roles                  - autoscaling:DescribeAutoScalingGroups
+#                  - autoscaling:UpdateAutoScalingGroup
+                Effect: Allow
+                Resource: '*'
+        - PolicyName: DescribeAutoScalingGroups
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                   - autoscaling:DescribeAutoScalingGroups
+                   - autoscaling:DescribeAutoScalingInstances
+                   - autoscaling:DescribeTags
+                Effect: Allow
+                Resource: '*'
+        - PolicyName: UpdateAutoScalingGroups
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                  - autoscaling:UpdateAutoScalingGroup
+                  - autoscaling:SetDesiredCapacity
+                Effect: Allow
+                Resource: '*'
+#        - PolicyName: DenyAllAssumeRoleForcedPolicy
+#          PolicyDocument:
+#            Version: '2012-10-17'
+#            Statement:
+#              - Action:
+#                  - ec2:*
+#                  - autoscaling:*
+#                Effect: Deny
+#               Resource: '*'
+#
+
+  LambdaFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: 
+        Fn::Sub: /acentera/${Stage}/default/plugins/ecseks/lambda/
+      RoleName: 
+        Fn::Sub: acentera-${Stage}-ecseks-${AWS::Region}-Lambda
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          # Only Allow Lambda functions
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - arn:aws:logs:*:*:*
+
+        - PolicyName: AllowAssumeRolePassTo3rdParty
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                  - sts:AssumeRole
+                Effect: Allow
+                Resource: "*"
+        - PolicyName: DescribeAndCreateAMIAndTagsLambda
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                  - ec2:DescribeTags
+                  - ec2:DescribeInstances
+                  - ec2:DescribeImages
+                  - ec2:DescribeSnapshots
+                  - ec2:CreateTags
+                  - ec2:CreateImage
+                  - ec2:DescribeSubnets
+                  - ec2:CreateSnapshot
+                  - ec2:DeleteSnapshot
+                  - ec2:DeregisterImage
+                  - autoscaling:DescribeAutoScalingGroups
+                  - autoscaling:*
+                  - sns:ConfirmSubscription
+                  - sns:CreateTopic
+                  - sns:DeleteEndpoint
+                  - sns:Get*
+                  - sns:List*
+                  - sns:Subscribe
+                  - sns:Set*
+                Effect: Allow
+                Resource: '*'
+        - PolicyName: DescribeLaunchConfigForAMICheck
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                 - ec2:DescribeLaunchTemplateVersions
+                 - ec2:DescribeLaunchTemplates
+                Effect: Allow
+                Resource: '*'
+        - PolicyName: DescribeAndCreateAMIAndTags
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                  - ec2:DescribeTags
+                  - ec2:DescribeInstances
+                  - ec2:DescribeImages
+                  - ec2:DescribeSnapshots
+                  - ec2:CreateTags
+                  - ec2:CreateImage
+                  - ec2:CreateSnapshot
+#                  - ec2:DeleteSnapshot
+#                  - ec2:DeregisterImage
+                  - autoscaling:DescribeAutoScalingGroups
+                  - autoscaling:UpdateAutoScalingGroup
+                Effect: Allow
+                Resource: '*'
+        - PolicyName: AllowLambdaCreateVolumeDestroyVolumesForMasterCreationASG
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                  - ec2:DescribeVolumes
+                  - ec2:DeleteVolume
+                  - ec2:CreateVolume
+                  - cloudformation:DescribeStacks
+                  - cloudformation:DescribeStackResource
+                Effect: Allow
+                Resource: '*'
+        - PolicyName: PassIAMRole
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                  - iam:PassRole
+                Effect: Allow
+                Resource: '*'
+
+  TransformExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: 
+        Fn::Sub: /acentera/${Stage}/default/plugins/ecseks/lambda/
+      RoleName: 
+        Fn::Sub: acentera-${Stage}-ecseks-${AWS::Region}-TransformLambda
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+            - Effect: Allow
+              Principal:
+                Service: [lambda.amazonaws.com]
+              Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+                - Effect: Allow
+                  Action: ['logs:*']
+                  Resource: 'arn:aws:logs:*:*:*'
+                - Effect: Allow
+                  Action: ['ec2:*']
+                  Resource: '*'
+
+  TransformFunctionPermissions:
+        Type: AWS::Lambda::Permission
+        Properties:
+            Action: 'lambda:InvokeFunction'
+            FunctionName: 
+               Fn::GetAtt: TransformFunction.Arn
+            Principal: 'cloudformation.amazonaws.com'
+
+  TransformFunction:
+        Type: AWS::Serverless::Function
+        Properties:
+            CodeUri: s3://%%BINARY%%/
+            Handler: main
+            # Runtime: python3.6
+            Runtime: go1.x
+            Environment:
+              Variables:
+                # Need ENV Vars ..
+                # ACENTERA_MASTER_URL: #- acentera-master
+                # Ref: SiteKey
+                # PLUGIN_ID:  AddPluginSiteExcute.Id
+                PLUGIN_ACTION: "VPC"
+            # FunctionName: !Sub ${AWS::StackName}-CFNTransform-ManageVPCAndAZ
+            FunctionName: 
+               Fn::Sub: acentera-${Stage}-ecseks-Transform-ManageVPCAndAZ
+               #Fn::Sub: acentera-${Stage}-ecseks-${AWS::Region}-ManageVPCTransorm
+            # Timeout: '60'
+            Role: 
+              Fn::GetAtt: 'TransformExecutionRole.Arn'
+
+#  Transform:
+#        Type: AWS::CloudFormation::Transform
+#        Properties:
+#            Name: !Sub '${AWS::AccountId}::ACenterA_${Stage}_ECSEKS_ManageVPCandAZ'
+#            Description: Macro to manage Cidr Rules for every specified VPC's
+#            RoutingTable:
+#                '*': 1
+#            Versions:
+#                - VersionName: 1
+#                  Description: Macro to manage Cidr Rules for every specified VPC's
+#                  FunctionName: !GetAtt TransformFunction.Arn
+#            ExecutionPolicy:
+#                Version: 2012-10-17
+#                Id: AllowOtherAccountPolicy
+#                Statement:
+#                    - Sid: AllowExecution
+#                      Effect: Allow
+#                      Principal:
+#                        AWS: !Sub '${AWS::AccountId}'
+#                      Action: 'cloudformation:CreateChangeSet'
+#                      Resource: !Sub 'arn:*:cloudformation:${AWS::Region}:${AWS::AccountId}:transform/ACenterA_${Stage}_ECSEKS_ManageVPCandAZ'
+
+  TransformMasterFunction:
+        Type: AWS::Serverless::Function
+        Properties:
+            CodeUri: s3://%%BINARY%%
+            Handler: main
+            Runtime: go1.x
+            FunctionName: 
+               Fn::Sub: acentera-${Stage}-ecseks-Transform-ManageASG
+            Environment:
+              Variables:
+                # Need ENV Vars ..
+                # ACENTERA_MASTER_URL: #- acentera-master
+                # Ref: SiteKey
+                # PLUGIN_ID:  AddPluginSiteExcute.Id
+                PLUGIN_ACTION: "ASG"
+            # Timeout: '60'
+            Role: 
+               Fn::GetAtt: 'TransformExecutionRole.Arn'
+
+  TransformMasterFunctionPermissions:
+        Type: AWS::Lambda::Permission
+        Properties:
+            Action: 'lambda:InvokeFunction'
+            FunctionName: 
+              Fn::GetAtt: TransformMasterFunction.Arn
+            Principal: 'cloudformation.amazonaws.com'
+
+##  TransformMaster:
+##        # Need permissions to elasticfilesystem:DescribeMountTargets .. and describe subnets / vpc
+##        Type: AWS::CloudFormation::Transform
+##        Properties:
+##            Name: !Sub '${AWS::AccountId}::ACenterA_${Stage}_ECSEKS_ManageCluster'
+##            Description: Macro to manage a Cluster of 1,3,5 or 7 nodes
+##            RoutingTable:
+##                '*': 1
+##            Versions:
+##                - VersionName: 1
+##                  Description: Macro to manage a Cluster of 1,3,5 or 7 nodes
+##                  FunctionName: !GetAtt TransformMasterFunction.Arn
+##            ExecutionPolicy:
+##                Version: 2012-10-17
+##                Id: AllowOtherAccountPolicy
+##                Statement:
+##                    - Sid: AllowExecution
+##                      Effect: Allow
+##                      Principal:
+##                        AWS: !Sub '${AWS::AccountId}'
+##                      Action: 'cloudformation:CreateChangeSet'
+##                      Resource: !Sub 'arn:*:cloudformation:${AWS::Region}:${AWS::AccountId}:transform/ACenterA_${Stage}_ECSEKS_ManageCluster'
+
+  DefaultNotificationPolicy:
+      Type: AWS::IAM::ManagedPolicy
+      Properties:
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:DeleteItem
+                - dynamodb:PutItem
+                # - dynamodb:Scan
+                - dynamodb:Query
+                - dynamodb:UpdateItem
+                - dynamodb:BatchWriteItem
+                - dynamodb:BatchGetItem
+              Resource:
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/acentera-${Stage}-AppData"
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/acentera-${Stage}-Sessions"
+                - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/acentera-${Stage}-AppData/index/*"
+            - Effect: Allow
+              Action:
+                - ec2:*
+                - cloudformation:*
+                - lambda:*
+                - s3:Get*
+                - s3:List*
+                - iam:PassRole
+                - autoscaling:*
+                - sns:Publish
+                - sns:List*
+                # Need to allow describe alarms, create, delete and rules
+                - cloudwatch:*
+                # - autoscaling:Create*
+                # - autoscaling:Delete*
+                # - autoscaling:Update*
+                # - autoscaling:Terminate*
+                # - autoscaling:Describe*
+              Resource:
+                - "*"
+
+  PluginHelpers:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: s3://%%BINARY%%
+      Timeout: 60
+      Environment:
+        Variables:
+          PLUGIN_ACTION: "TEST"
+      # This need to be hard-coded for now
+      FunctionName: 
+           Fn::Sub: acentera-${Stage}-ecseks-PluginHelper
+      Runtime: go1.x
+      Policies: 
+           Ref: "PluginHelpersPolicy"
+
+#  DataMigrationHelpers:
+#    Type: AWS::Serverless::Function
+#    Properties:
+#      CodeUri: s3://lambda-at-edge-dev-serverlessdeploymentbucket-1gmbbmp4ajnba/packaged/2019/0.0.1/acentera-ecseks/xxxx
+#      Timeout: 60
+#      Environment:
+#        Variables:
+#          PLUGIN_ACTION: "DATA_MIGRATION"
+#      # This need to be hard-coded for now
+#      FunctionName: 
+#           Fn::Sub: acentera-${Stage}-ecseks-DataMigration
+#      Runtime: go1.x
+#      Policies: 
+#         Ref: "PluginHelpersPolicy"
+
+  PluginHelpersPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:GetItem
+              - dynamodb:DeleteItem
+              - dynamodb:PutItem
+              - dynamodb:Query
+              - dynamodb:UpdateItem
+              - dynamodb:BatchWriteItem
+              - dynamodb:BatchGetItem
+            Resource:
+              - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/acentera-${Stage}-AppData"
+              - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/acentera-${Stage}-Sessions"
+              - Fn::Sub: "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/acentera-${Stage}-AppData/index/*"
+          # TODO: Add an condition for -acentera- in name ?
+          - Effect: Allow
+            Action:
+              - cloudformation:Describe*
+              - cloudformation:Create*
+              # Create macro ?
+              - cloudformation:*
+              - iam:PassRole
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - lambda:Invoke*
+              - lambda:*
+            Resource: 
+               Fn::Sub: "arn:aws:lambda:*:${AWS::AccountId}:function:acentera-${Stage}-*"
+          - Effect: Allow
+            Action:
+              - s3:ListBucket
+            Resource:
+               Fn::Sub:
+                  - "arn:aws:s3:::${BUCKET}"
+                  - BUCKET: 
+                         Fn::If:
+                            - IsS3Defined
+                            - Ref: AppS3Assets
+                            - Fn::Sub: "acentera-core-${Stage}-assets-${AWS::Region}-${AWS::AccountId}"
+          - Effect: Allow
+            Action:
+              # Only allow Put, List or List
+              - s3:GetObject
+              - s3:Put*
+              - s3:List*
+            Resource:
+               Fn::Sub:
+                  - "arn:aws:s3:::${BUCKET}/*"
+                  - BUCKET: 
+                         Fn::If:
+                            - IsS3Defined
+                            - Ref: AppS3Assets
+                            - Fn::Sub: "acentera-core-${Stage}-assets-${AWS::Region}-${AWS::AccountId}"
+
+  LambdaNotificationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: main
+      Runtime: go1.x
+      Timeout: 300
+      # CodeUri: ./handlers/sns-notification
+      # Todo ..
+      CodeUri: s3://%%BINARY%%
+      FunctionName: 
+          Fn::Sub: acentera-${Stage}-ecseks-${AWS::Region}-SnsNotification
+      Environment:
+        Variables:
+          S3_BUCKET: 
+                         Fn::If:
+                            - IsS3Defined
+                            - Ref: AppS3Assets
+                            - Fn::Sub: "acentera-core-${Stage}-assets-${AWS::Region}-${AWS::AccountId}"
+      Policies:
+        Ref: DefaultNotificationPolicy
+    Type: AWS::Serverless::Function
+
+  LambdaPermission:
+     Type: AWS::Lambda::Permission
+     Properties:
+        Action: "lambda:InvokeFunction"
+        FunctionName: 
+            Fn::GetAtt: "LambdaNotificationFunction.Arn"
+        Principal: "sns.amazonaws.com"
+        SourceArn: 
+            Ref: Topic
+
+  Topic:
+    Type: 'AWS::SNS::Topic'
+    Properties:
+      TopicName: 
+          Fn::Sub: "acentera-${Stage}-ecseks"
+      DisplayName: 
+          Fn::Sub: "[ ${Stage} ] acentera ecseks - Notifications"
+      Subscription:
+         - Endpoint: 
+              Fn::GetAtt: "LambdaNotificationFunction.Arn"
+           Protocol: lambda
+
+  TopicPolicy:
+    Type: 'AWS::SNS::TopicPolicy'
+    Properties:
+      PolicyDocument:
+        Id: Id1
+        Version: '2012-10-17'
+        Statement:
+        - Sid: Sid1
+          Effect: Allow
+          Principal:
+            Service:
+            - 'events.amazonaws.com' # Allow CloudWatch Events
+            - 'budgets.amazonaws.com' # Allow Budget Notifications
+            - 'rds.amazonaws.com' # Allow RDS Events
+            - 's3.amazonaws.com' # Allow S3 Event Notifications
+          Action: 'sns:Publish'
+          Resource: 
+             Ref: Topic
+        - Sid: AllowCurrentAccountObjectToPublishMessages
+          Effect: Allow
+          Principal:
+            AWS: '*' # Allow CloudWatch Alarms, ElastiCache Notifications, Elastic Beanstalk Notifications, Auto Scaling Notification
+          Action: 'sns:Publish'
+          Resource: 
+              Ref: Topic
+          Condition:
+            StringEquals:
+              'AWS:SourceOwner': 
+                  Ref: 'AWS::AccountId'
+        - Sid: AllowCurrentAccountToSendEmailUsingSes
+          Effect: Allow
+          Principal:
+            Service: 'ses.amazonaws.com' # Allow SES Notifications & Events
+          Action: 'sns:Publish'
+          Resource: 
+              Ref: Topic
+          Condition:
+            StringEquals:
+              'AWS:Referer': 
+                  Ref: 'AWS::AccountId'
+      Topics:
+      - Ref: Topic
+
+  FallbackTopic:
+    Type: 'AWS::SNS::Topic'
+    Properties:
+      TopicName: 
+           Fn::Sub: "acentera-${Stage}-ecseks-Error"
+      DisplayName: 
+           Fn::Sub: "[ ${Stage} ] acentera ecseks Notifications Errors"
