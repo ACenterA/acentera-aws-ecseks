@@ -11,9 +11,15 @@ Serverless App Dependencies:
 
 
   All launched EC2 instances launch with System Manager configured. To login into your EC2 Instances, you may use the System Manager from AWS Console.
-  Each AutoScaling groups will have alarms defined (if SNS is configured). Warning and Critical alarms for disks space for each AutoScaling groups, instead of per VM. Via CloudWatch filtering, you could find the faulty VM's.
-  Spot instance hooks are automatically enabled on each provisionned EC2 Instances
-  Cluster AutoScaling Up/Down (if enabled), based on number of CPU + Memory remaining in the cluster per set of ASG, or if Distinct Instance criteria are not met.
+  Each AutoScaling groups will have alarms defined (if SNS is configured). 
+  
+    - Warning and Critical alarms for disks space for each AutoScaling groups, instead of per VM. Via CloudWatch filtering, you could find the faulty VM's.
+    - Spot instance hooks are automatically enabled on each provisionned EC2 Instances
+    - Cluster AutoScaling Up/Down (if enabled), based on number of CPU + Memory remaining in the cluster per set of ASG, or if Distinct Instance criteria are not met.
+    - Docker Volume Improvement, ( Resize of EBS )
+    - Rolling Update of new AMI (without interruption of services)
+    - We plan to provide future add-ons such as (Setup a Consul cluster, MongoDB / ES cluster / Splunk / etc ... )
+  
   And many more functionalities / features including features that can help you with SOC or PCI...
 
 ## Overview
