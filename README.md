@@ -38,15 +38,15 @@ Serverless App Dependencies:
 
 1 - Find the application
 
-  For ACenterA Prod Core you need to acknowledge it will create IAM Roles or Resource policies.
+  For ACenterA ECS Resources you need to acknowledge it will create IAM Roles or Resource policies.
 
   [Serverless Repository](https://console.aws.amazon.com/serverlessrepo/home?region=us-east-1#/available-applications)
 
-  [Serverless Create App direct link](https://console.aws.amazon.com/lambda/home?region=us-east-1#/create/app?applicationId=arn:aws:serverlessrepo:us-east-1:356769441913:applications/acentera-prod-ecseks-resources)
+  [Serverless App: Create ECS Resources direct link](https://console.aws.amazon.com/lambda/home?region=us-east-1#/create/app?applicationId=arn:aws:serverlessrepo:us-east-1:356769441913:applications/acentera-prod-ecseks-resources)
 
-  [Serverless Create App direct link](https://console.aws.amazon.com/lambda/home?region=us-east-1#/create/app?applicationId=arn:aws:serverlessrepo:us-east-1:356769441913:applications/acentera-prod-ecseks)
+  [Serverless App: Create ECS Solution direct link](https://console.aws.amazon.com/lambda/home?region=us-east-1#/create/app?applicationId=arn:aws:serverlessrepo:us-east-1:356769441913:applications/acentera-prod-ecseks)
 
-  ![01 - Serverless App Core](https://github.com/ACenterA/acentera-aws-core/raw/master/docs/images/01_ACENTERA_CORE_PROD.png)
+  ![01 - Serverless App ECS Solution](https://github.com/ACenterA/acentera-aws-ecseks/raw/master/docs/images/00_acentera_serverless_app.png)
 
 2 - Find Values in the Stack Output
  
@@ -71,6 +71,22 @@ Serverless App Dependencies:
    In this section you may create a cluster definition (In its own VPC using AWS's best practices).
    You will be asked to specify the CIDR  of Public, App and DB network, and if you would like to use various
    NAT and a EFS Storage.
+
+  ![Create : Cluster](https://github.com/ACenterA/acentera-aws-ecseks/raw/master/docs/images/01_acentera_ecs_create_cluster.png)
+
+  ![Create : VPC](https://github.com/ACenterA/acentera-aws-ecseks/raw/master/docs/images/02_acentera_ecs_create_cluster_vpc.png)
+
+  ![Create : Public Subnets](https://github.com/ACenterA/acentera-aws-ecseks/raw/master/docs/images/03_acentera_ecs_create_public_zone.png)
+
+  ![Create : Private Subnets](https://github.com/ACenterA/acentera-aws-ecseks/raw/master/docs/images/04_acentera_ecs_ceate_app_zone.png)
+
+  ![Create : DB (Data) Subnets](https://github.com/ACenterA/acentera-aws-ecseks/raw/master/docs/images/05_accentera_ecs_create_data_zone.png)
+
+  ![Create : EFS](https://github.com/ACenterA/acentera-aws-ecseks/raw/master/docs/images/06_acentera_ecs_select_efs_option.png)
+
+  Once you confirm, it would run the generated AWS CloudFormation Template with all the resources.
+
+  ![Create : Cloudformation](https://github.com/ACenterA/acentera-aws-ecseks/raw/master/docs/images/07_acentera_create_cluster_cloudformation.png)
 
 9 - New AMI
    
