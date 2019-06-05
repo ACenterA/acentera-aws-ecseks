@@ -9,13 +9,14 @@ Serverless App Dependencies:
    - acentera-prod-core
    - acentera-prod-ecseks-resources
 
-
-  All launched EC2 instances launch with System Manager configured. To login into your EC2 Instances, you may use the System Manager from AWS Console.
+  All launched EC2 instances launch with System Manager configured (and without SSH for security reasons ). To login into your EC2 Instances, you may use the System Manager from AWS Console.
   Each AutoScaling groups will have alarms defined (if SNS is configured). 
   
     - Warning and Critical alarms for disks space for each AutoScaling groups, instead of per VM. Via CloudWatch filtering, you could find the faulty VM's.
+    - Updating of ECS Instance Tag to prevent addition of new Containers on that host until it is resolved.
     - Spot instance hooks are automatically enabled on each provisionned EC2 Instances
-    - Cluster AutoScaling Up/Down (if enabled), based on number of CPU + Memory remaining in the cluster per set of ASG, or if Distinct Instance criteria are not met.
+    - Cluster AutoScaling Up/Down (if enabled), based on number of CPU + Memory remaining in the cluster per set of ASG
+    - Distinct Instance criteria, autoscaling.
     - Docker Volume Improvement, ( Resize of EBS )
     - Rolling Update of new AMI (without interruption of services)
     - We plan to provide future add-ons such as (Setup a Consul cluster, MongoDB / ES cluster / Splunk / etc ... )
@@ -118,6 +119,8 @@ Contact support, and ask for a premium access to allow embedding this app into a
 1. `WebsiteUrl` - Your aws cloudfront https entrypoint.
 
 ## Generic ASG Configuration
+
+  Cloudformation Input fields for the Worker ASG CF Created.
 
       # The Shared AWS EFS. Leave empty, or specify 
       # an existing filesystem id such as 'fs-xxxxxx'
